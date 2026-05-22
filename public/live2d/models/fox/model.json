@@ -1,0 +1,44 @@
+{
+	"version":"Sample 1.0.0",
+	"model":"BCY.moc",
+	"textures":[
+		"Texture2D/texture_00.png"
+	],
+	"motions":{
+		"idle":[
+			{"file":"TextAsset/idle.mtn"}
+		],
+		"tap_body":[
+			{"file":"TextAsset/happy.mtn"},
+			{"file":"TextAsset/soft.mtn"}
+		],
+		"shake":[
+			{"file":"TextAsset/confused.mtn"}
+		],
+		"flick_head":[
+			{"file":"TextAsset/happy.mtn"}
+		],
+		"tap_face":[
+			{"file":"TextAsset/happy.mtn"}
+		],
+		"laugh":[
+			{"file":"TextAsset/laugh.mtn"}
+		],
+		"smart":[
+			{"file":"TextAsset/smart.mtn"}
+		],
+		"joke":[
+			{"file":"TextAsset/joke.mtn"}
+		]
+	},
+	"name":"fox",
+	"layout":
+	{
+		"image_height": 750,
+		"image_center_y": -0.25,
+		"anchor_center_y": 0,
+		"head_center_y": 0.5,
+		"time_to_max_speed": 0.08,
+		"face_max_angle": 20
+	}
+}

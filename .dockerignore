@@ -1,0 +1,27 @@
+node_modules
+.next
+.git
+.gitignore
+
+# 数据库文件（运行时由卷管理）
+*.db
+*.db-shm
+*.db-wal
+
+# 密钥与环境变量（通过 docker-compose env_file 注入，不打进镜像）
+.env.local
+.env
+
+# 上传文件（运行时由卷管理）
+public/uploads
+
+# Claude Code 本地配置
+.claude
+
+# 私人文档
+设计.md
+开发.md
+
+# 开发工具
+README.md
+docs

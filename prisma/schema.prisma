@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  type        String
+  category    String
+  description String
+  techStack   String
+  highlights  String
+  githubUrl   String?
+  demoUrl     String?
+  coverUrl    String?
+  isFeatured  Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Tool {
+  id            String   @id @default(cuid())
+  name          String
+  category      String
+  type          String
+  description   String
+  url           String?
+  fileUrl       String?
+  tags          String
+  isRecommended Boolean  @default(false)
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Live2DLine {
+  id      String  @id @default(cuid())
+  text    String
+  scene   String
+  weight  Float   @default(1)
+  enabled Boolean @default(true)
+}
+
+model SiteConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model About {
+  id        String   @id @default("singleton")
+  data      String
+  updatedAt DateTime @updatedAt
+}
+
+model PageView {
+  id        String   @id @default(cuid())
+  page      String
+  createdAt DateTime @default(now())
+}
