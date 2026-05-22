@@ -6,8 +6,6 @@
 ## 截图展示
 -前端
 <img width="2744" height="1356" alt="image" src="https://github.com/user-attachments/assets/0a630e75-3853-449e-b91c-4bddcfe156fc" />
-
-
 -后端
 <img width="2771" height="1393" alt="image" src="https://github.com/user-attachments/assets/483e3b2c-0904-4deb-aa66-4d10271751ab" />
 
