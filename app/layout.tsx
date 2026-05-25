@@ -5,17 +5,12 @@ import { Background } from '@/components/layout/Background'
 import { ClientShell } from '@/components/layout/ClientShell'
 import { FirstVisitModal, DEFAULT_WELCOME } from '@/components/modals/FirstVisitModal'
 import type { WelcomeConfig } from '@/components/modals/FirstVisitModal'
-import nextDynamic from 'next/dynamic'
+import { Live2DWidgetLoader } from '@/components/live2d/Live2DWidgetLoader'
 import { StoreHydrator } from '@/components/layout/StoreHydrator'
 import { PageViewTracker } from '@/components/analytics/PageViewTracker'
 import { getAllConfigs } from '@/lib/db/config'
 import { getLive2DConfig } from '@/lib/db/live2d'
 import type { Live2DModel } from '@/store'
-
-const Live2DWidget = nextDynamic(
-  () => import('@/components/live2d/Live2DWidget').then((m) => m.Live2DWidget),
-  { ssr: false }
-)
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -74,7 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <FirstVisitModal config={welcomeConfig} />
 
         {/* Live2D 角色 */}
-        <Live2DWidget />
+        <Live2DWidgetLoader />
 
         {/* 顶部导航 + 页面内容（后台路由不渲染导航和留白） */}
         <ClientShell>
