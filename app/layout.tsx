@@ -5,8 +5,8 @@ import { Background } from '@/components/layout/Background'
 import { ClientShell } from '@/components/layout/ClientShell'
 import { FirstVisitModal, DEFAULT_WELCOME } from '@/components/modals/FirstVisitModal'
 import type { WelcomeConfig } from '@/components/modals/FirstVisitModal'
-import dynamic from 'next/dynamic'
-const Live2DWidget = dynamic(
+import nextDynamic from 'next/dynamic'
+const Live2DWidget = nextDynamic(
   () => import('@/components/live2d/Live2DWidget').then((m) => m.Live2DWidget),
   { ssr: false }
 )
