@@ -35,6 +35,7 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # Prisma：Linux 平台生成的客户端 + schema（供首次 db push 使用）
 COPY --from=builder /app/lib/generated ./lib/generated
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./
 COPY package.json ./
 
 # 持久化目录占位（运行时由 Docker 卷挂载覆盖）
