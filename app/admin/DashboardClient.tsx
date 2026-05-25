@@ -105,7 +105,7 @@ export function DashboardClient({
               }}
               labelStyle={{ color: '#374151', fontWeight: 600, marginBottom: 2 }}
               itemStyle={{ color: '#3b82f6' }}
-              formatter={(value: number) => [value, '访问量']}
+              formatter={(value) => [value, '访问量']}
             />
             <Line
               type="monotone"
