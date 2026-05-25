@@ -6,15 +6,16 @@ import { ClientShell } from '@/components/layout/ClientShell'
 import { FirstVisitModal, DEFAULT_WELCOME } from '@/components/modals/FirstVisitModal'
 import type { WelcomeConfig } from '@/components/modals/FirstVisitModal'
 import nextDynamic from 'next/dynamic'
-const Live2DWidget = nextDynamic(
-  () => import('@/components/live2d/Live2DWidget').then((m) => m.Live2DWidget),
-  { ssr: false }
-)
 import { StoreHydrator } from '@/components/layout/StoreHydrator'
 import { PageViewTracker } from '@/components/analytics/PageViewTracker'
 import { getAllConfigs } from '@/lib/db/config'
 import { getLive2DConfig } from '@/lib/db/live2d'
 import type { Live2DModel } from '@/store'
+
+const Live2DWidget = nextDynamic(
+  () => import('@/components/live2d/Live2DWidget').then((m) => m.Live2DWidget),
+  { ssr: false }
+)
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
