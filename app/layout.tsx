@@ -5,7 +5,11 @@ import { Background } from '@/components/layout/Background'
 import { ClientShell } from '@/components/layout/ClientShell'
 import { FirstVisitModal, DEFAULT_WELCOME } from '@/components/modals/FirstVisitModal'
 import type { WelcomeConfig } from '@/components/modals/FirstVisitModal'
-import { Live2DWidget } from '@/components/live2d/Live2DWidget'
+import dynamic from 'next/dynamic'
+const Live2DWidget = dynamic(
+  () => import('@/components/live2d/Live2DWidget').then((m) => m.Live2DWidget),
+  { ssr: false }
+)
 import { StoreHydrator } from '@/components/layout/StoreHydrator'
 import { PageViewTracker } from '@/components/analytics/PageViewTracker'
 import { getAllConfigs } from '@/lib/db/config'
