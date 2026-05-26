@@ -35,9 +35,10 @@ function pathToIdleScene(path: string): string {
 }
 
 export function Live2DWidget() {
-  const widgetRef    = useRef<{ destroy: () => Promise<void> } | null>(null)
-  const wrapperRef   = useRef<HTMLDivElement>(null)
-  const observerRef  = useRef<MutationObserver | null>(null)
+  const widgetRef          = useRef<{ destroy: () => Promise<void> } | null>(null)
+  /** l2d-widget 自己创建的 container div（canvas 的父元素），用于同步拖拽 transform */
+  const widgetContainerRef = useRef<HTMLElement | null>(null)
+  const observerRef        = useRef<MutationObserver | null>(null)
   const linesRef     = useRef<LinesByScene>({})
   /** 当前气泡是否正在展示（防止外部 trigger 覆盖聊天思考提示） */
   const isShowingRef  = useRef(false)
@@ -63,6 +64,13 @@ export function Live2DWidget() {
 
   // 同步 live2dLine 到 ref，供 trigger effect 安全读取
   useEffect(() => { liveLineRef.current = live2dLine }, [live2dLine])
+
+  // 拖拽位移同步到 l2d-widget 的原生 container div
+  useEffect(() => {
+    if (widgetContainerRef.current) {
+      widgetContainerRef.current.style.transform = `translate(${pos.x}px, ${pos.y}px)`
+    }
+  }, [pos])
 
   // ── 首次挂载：从 DB 拉取台词 ────────────────────────────────────────────────
   useEffect(() => {
@@ -148,6 +156,7 @@ export function Live2DWidget() {
       if (cancelled) return
 
       if (widgetRef.current) {
+        widgetContainerRef.current = null
         await widgetRef.current.destroy().catch(() => {})
         widgetRef.current = null
       }
@@ -162,13 +171,16 @@ export function Live2DWidget() {
 
       if (!cancelled) {
         setTimeout(() => {
-          if (cancelled || !wrapperRef.current) return
+          if (cancelled) return
+          // l2d-widget 把 canvas 放在自己的 container div 里，直接引用该 div 做拖拽
+          // 绝对不能把 canvas 移走——那会断开 l2d 内部渲染循环
           const canvas = document.querySelector('canvas')
-          if (canvas && canvas.parentNode !== wrapperRef.current) {
-            canvas.style.position = 'static'
-            canvas.style.bottom   = ''
-            canvas.style.left     = ''
-            wrapperRef.current.appendChild(canvas)
+          const container = canvas?.parentElement as HTMLElement | null
+          if (container) {
+            widgetContainerRef.current = container
+            // 让我们的透明遮罩层拦截指针事件，canvas 只负责渲染
+            canvas!.style.pointerEvents = 'none'
+            container.style.transform = 'translate(0px, 0px)'
           }
           removeTips()
           observerRef.current?.disconnect()
@@ -200,6 +212,7 @@ export function Live2DWidget() {
       clearInterval(idleTimer)
       observerRef.current?.disconnect()
       observerRef.current = null
+      widgetContainerRef.current = null   // 先清空，防止 pos effect 操作已销毁元素
       widgetRef.current?.destroy().catch(() => {})
       widgetRef.current = null
     }
@@ -236,34 +249,27 @@ export function Live2DWidget() {
 
   return (
     <>
-      {/* canvas wrapper — overflow-hidden 裁切 canvas */}
+      {/* 气泡容器 — 跟随拖拽 transform，z-index 在 l2d-widget(9999) 之上 */}
       <div
-        ref={wrapperRef}
-        className="fixed bottom-0 left-0 z-35 overflow-hidden"
-        style={{ width: live2dSize, height: live2dSize, transform }}
-      />
-
-      {/* 气泡容器 — 无 overflow-hidden，气泡向上溢出；共享 transform 跟随拖拽 */}
-      <div
-        className="fixed bottom-0 left-0 pointer-events-none z-36"
-        style={{ width: live2dSize, height: live2dSize, transform }}
+        className="fixed bottom-0 left-0 pointer-events-none"
+        style={{ width: live2dSize, height: live2dSize, transform, zIndex: 10000 }}
       >
         <SpeechBubble text={live2dLine} />
       </div>
 
       {/* 底部柔和投影 */}
       <div
-        className="fixed bottom-0 left-0 pointer-events-none z-34"
+        className="fixed bottom-0 left-0 pointer-events-none"
         style={{
-          width: live2dSize, height: 28, transform,
+          width: live2dSize, height: 28, transform, zIndex: 9998,
           background: 'radial-gradient(ellipse 60% 100% at 50% 100%, rgba(0,0,0,0.38) 0%, transparent 70%)',
         }}
       />
 
-      {/* 拖拽 + 点击透明层 */}
+      {/* 拖拽 + 点击透明层 — 必须在 l2d-widget canvas(9999) 之上才能拦截事件 */}
       <div
-        className="fixed bottom-0 left-0 z-40 touch-none select-none cursor-grab active:cursor-grabbing"
-        style={{ width: live2dSize, height: live2dSize, transform }}
+        className="fixed bottom-0 left-0 touch-none select-none cursor-grab active:cursor-grabbing"
+        style={{ width: live2dSize, height: live2dSize, transform, zIndex: 10001 }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
