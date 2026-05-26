@@ -68,8 +68,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* 首次访问弹窗 */}
         <FirstVisitModal config={welcomeConfig} />
 
-        {/* Live2D 角色 */}
-        <Live2DWidgetLoader />
+        {/* Live2D 角色 — 直接从 DB 传入初始值，跳过 store 默认值造成的双重初始化 */}
+        <Live2DWidgetLoader
+          initialModel={(configs.live2dModel as Live2DModel) ?? live2d.model}
+          initialSize={live2d.size}
+        />
 
         {/* 顶部导航 + 页面内容（后台路由不渲染导航和留白） */}
         <ClientShell>

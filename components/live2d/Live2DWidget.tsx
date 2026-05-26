@@ -34,9 +34,18 @@ function pathToIdleScene(path: string): string {
   return 'idle'
 }
 
-export function Live2DWidget() {
+interface Props {
+  /** 从 layout 服务端读取的初始模型，避免 store 默认值(blanc)→DB值(golden) 造成双重初始化 */
+  initialModel: Live2DModel
+  initialSize: number
+}
+
+export function Live2DWidget({ initialModel, initialSize }: Props) {
   const widgetRef          = useRef<{ destroy: () => Promise<void> } | null>(null)
-  /** l2d-widget 自己创建的 container div（canvas 的父元素），用于同步拖拽 transform */
+  /**
+   * l2d-widget 自己创建的 container div（canvas 的父元素），用于同步拖拽 transform。
+   * 通过 MutationObserver 精确捕获，不再用 querySelector（可能选中旧/错误元素）。
+   */
   const widgetContainerRef = useRef<HTMLElement | null>(null)
   const observerRef        = useRef<MutationObserver | null>(null)
   const linesRef     = useRef<LinesByScene>({})
@@ -138,9 +147,27 @@ export function Live2DWidget() {
   }, [getLine, showLine])
 
   // ── Widget 初始化（模型/大小变化时重新执行）────────────────────────────────
+  //
+  // 重要设计决策：
+  // 1. 使用 initialModel/initialSize（来自 layout 服务端）作为首次渲染的模型，
+  //    避免 store 默认值(blanc)→DB值(golden) 造成双重初始化竞态。
+  //    store 值变化（如管理员在后台切换模型）仍会触发重新初始化。
+  // 2. 用 MutationObserver 捕获 createWidget 创建的 container，
+  //    防止 querySelector 选中其他 canvas 或旧 widget 的残留 canvas。
+  // 3. 使用 transitionType: 'fade'，destroy() 内部走 setTimeout(1500ms)
+  //    而非等待 transitionend，避免在首次 slide-in 前就 destroy 时永久挂死。
+  //
+  // l2d-widget DOM 结构：
+  //   body > div.container(position:fixed;z-index:9999) > canvas
+  //   body > div.menu（单独挂载）
+  // destroy() 会调用 body.removeChild(container)，canvas 随之移除。
+  const effectModel = live2dModel !== initialModel ? live2dModel : initialModel
+  const effectSize  = live2dSize  !== initialSize  ? live2dSize  : initialSize
+
   useEffect(() => {
     let cancelled = false
     let idleTimer: ReturnType<typeof setInterval>
+    let containerMutObs: MutationObserver | null = null
 
     const removeTips = () => {
       document.querySelectorAll(
@@ -155,43 +182,53 @@ export function Live2DWidget() {
       const { createWidget } = await import('l2d-widget')
       if (cancelled) return
 
+      // 销毁旧 widget（使用 fade 模式时 destroy() 走 setTimeout，不会挂死）
       if (widgetRef.current) {
         widgetContainerRef.current = null
+        containerMutObs?.disconnect()
+        containerMutObs = null
         await widgetRef.current.destroy().catch(() => {})
         widgetRef.current = null
       }
+      if (cancelled) return
+
+      // 在 createWidget 之前设置 MutationObserver，精确捕获本次创建的 container
+      containerMutObs = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node instanceof HTMLElement) {
+              const canvas = node.querySelector('canvas')
+              if (canvas) {
+                widgetContainerRef.current = node
+                // 禁用 canvas 的指针事件，由我们的透明遮罩层接管
+                ;(canvas as HTMLElement).style.pointerEvents = 'none'
+                containerMutObs?.disconnect()
+                containerMutObs = null
+                break
+              }
+            }
+          }
+        }
+      })
+      containerMutObs.observe(document.body, { childList: true })
 
       widgetRef.current = createWidget({
-        // tips: false → 彻底禁用内置蓝色气泡，由我们的 SpeechBubble 统一管理
-        model: { path: MODEL_PATHS[live2dModel], tips: false },
+        // tips: false → 彻底禁用内置气泡，由 SpeechBubble 统一管理
+        model: { path: MODEL_PATHS[effectModel], tips: false },
         position: 'bottom-left',
-        size: live2dSize,
+        size: effectSize,
         primaryColor: 'rgba(96,165,250,0.85)',
+        // fade 模式：destroy() 走 setTimeout(transitionDuration) 而非 transitionend
+        // 避免在模型未加载时 destroy() 因 transform 无变化而永远等待 transitionend
+        transitionType: 'fade',
+        transitionDuration: 600,
       })
 
       if (!cancelled) {
-        setTimeout(() => {
-          if (cancelled) return
-          // l2d-widget 把 canvas 放在自己的 container div 里，直接引用该 div 做拖拽
-          // 绝对不能把 canvas 移走——那会断开 l2d 内部渲染循环
-          const canvas = document.querySelector('canvas')
-          const container = canvas?.parentElement as HTMLElement | null
-          if (container) {
-            widgetContainerRef.current = container
-            // 让我们的透明遮罩层拦截指针事件，canvas 只负责渲染
-            canvas!.style.pointerEvents = 'none'
-            container.style.transform = 'translate(0px, 0px)'
-          }
-          removeTips()
-          observerRef.current?.disconnect()
-          observerRef.current = new MutationObserver(removeTips)
-          observerRef.current.observe(document.body, { childList: true })
-        }, 900)
-
         // 欢迎台词
         setTimeout(() => {
           if (!cancelled) showLine(getLine('enter-home') || '欢迎来到 Ashia 的展示站！', 4000)
-        }, 1300)
+        }, 1600)
 
         // 页面感知的 idle 台词定时器
         idleTimer = setInterval(() => {
@@ -201,6 +238,11 @@ export function Live2DWidget() {
             if (line) showLine(line, 4000)
           }
         }, 12000)
+
+        // 启动 tips 清除 observer
+        observerRef.current?.disconnect()
+        observerRef.current = new MutationObserver(removeTips)
+        observerRef.current.observe(document.body, { childList: true })
       }
     }
 
@@ -210,14 +252,16 @@ export function Live2DWidget() {
     return () => {
       cancelled = true
       clearInterval(idleTimer)
+      containerMutObs?.disconnect()
+      containerMutObs = null
       observerRef.current?.disconnect()
       observerRef.current = null
-      widgetContainerRef.current = null   // 先清空，防止 pos effect 操作已销毁元素
+      widgetContainerRef.current = null
       widgetRef.current?.destroy().catch(() => {})
       widgetRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live2dModel, live2dSize])
+  }, [effectModel, effectSize])
 
   // ── 拖拽 ─────────────────────────────────────────────────────────────────────
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -235,8 +279,8 @@ export function Live2DWidget() {
     const rawX = dragRef.current.ox + dx
     const rawY = dragRef.current.oy + dy
     setPos({
-      x: Math.max(0, Math.min(window.innerWidth  - live2dSize, rawX)),
-      y: Math.max(-(window.innerHeight - live2dSize), Math.min(0, rawY)),
+      x: Math.max(0, Math.min(window.innerWidth  - effectSize, rawX)),
+      y: Math.max(-(window.innerHeight - effectSize), Math.min(0, rawY)),
     })
   }
 
@@ -252,7 +296,7 @@ export function Live2DWidget() {
       {/* 气泡容器 — 跟随拖拽 transform，z-index 在 l2d-widget(9999) 之上 */}
       <div
         className="fixed bottom-0 left-0 pointer-events-none"
-        style={{ width: live2dSize, height: live2dSize, transform, zIndex: 10000 }}
+        style={{ width: effectSize, height: effectSize, transform, zIndex: 10000 }}
       >
         <SpeechBubble text={live2dLine} />
       </div>
@@ -261,7 +305,7 @@ export function Live2DWidget() {
       <div
         className="fixed bottom-0 left-0 pointer-events-none"
         style={{
-          width: live2dSize, height: 28, transform, zIndex: 9998,
+          width: effectSize, height: 28, transform, zIndex: 9998,
           background: 'radial-gradient(ellipse 60% 100% at 50% 100%, rgba(0,0,0,0.38) 0%, transparent 70%)',
         }}
       />
@@ -269,7 +313,7 @@ export function Live2DWidget() {
       {/* 拖拽 + 点击透明层 — 必须在 l2d-widget canvas(9999) 之上才能拦截事件 */}
       <div
         className="fixed bottom-0 left-0 touch-none select-none cursor-grab active:cursor-grabbing"
-        style={{ width: live2dSize, height: live2dSize, transform, zIndex: 10001 }}
+        style={{ width: effectSize, height: effectSize, transform, zIndex: 10001 }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
