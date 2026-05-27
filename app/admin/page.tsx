@@ -54,12 +54,16 @@ function buildAllTime(dates: Date[]): PeriodData {
 export default async function AdminDashboard() {
   const now = new Date()
 
+  // 只取最近 90 天的 PV 数据，防止全表扫描在大量记录时拖慢首屏
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+
   const [projectCount, toolCount, lineCount, rawViews] = await Promise.all([
     db.project.count(),
     db.tool.count(),
     db.live2DLine.count(),
     db.pageView.findMany({
       select: { createdAt: true },
+      where: { createdAt: { gte: ninetyDaysAgo } },
       orderBy: { createdAt: 'asc' },
     }),
   ])

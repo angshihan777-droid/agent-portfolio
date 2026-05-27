@@ -19,7 +19,12 @@ export default function LoginPage() {
       body: JSON.stringify({ password }),
     })
     if (res.ok) {
-      router.push('/admin')
+      // 使用硬跳转而非 router.push：
+      // router.push 触发 RSC 加载（仪表盘数据查询可能需要数秒），
+      // 期间 setLoading(false) 已执行，页面看起来没反应，用户误以为未登录。
+      // window.location.href 触发完整页面加载，浏览器自带进度条，用户体验明确。
+      window.location.href = '/admin'
+      return // 不再 setLoading(false)，保持 loading 状态直到页面卸载
     } else {
       setError('密码错误')
     }
