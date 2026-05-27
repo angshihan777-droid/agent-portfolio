@@ -55,6 +55,7 @@ export function StoreHydrator({
         if (typeof data.panelOpacity === 'number')   setPanelOpacity(data.panelOpacity)
         if (typeof data.navOpacity === 'number')     setNavOpacity(data.navOpacity)
         if (typeof data.agentName === 'string')      setAgentName(data.agentName)
+        if (typeof data.wallpaper === 'string' && data.wallpaper) setWallpaper(data.wallpaper)
       })
       .catch(() => { /* 静默失败，使用 Server props 作为 fallback */ })
   // eslint-disable-next-line react-hooks/exhaustive-deps

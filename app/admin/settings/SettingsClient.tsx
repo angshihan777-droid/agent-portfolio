@@ -135,6 +135,16 @@ export function SettingsClient({
           </span>
           <input type="file" accept="image/*" onChange={uploadWallpaper} className="hidden" />
         </label>
+        {wallpaper && (
+          <div>
+            <p className="text-xs text-gray-400 mb-1.5">预览（壁纸效果在<a href="/" target="_blank" className="text-blue-500 underline">前台页面</a>展示）</p>
+            <img
+              src={wallpaper}
+              alt="壁纸预览"
+              className="w-full h-32 object-cover rounded-lg border border-gray-200"
+            />
+          </div>
+        )}
       </section>
 
       {/* 前台透明度 */}

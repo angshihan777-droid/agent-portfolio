@@ -13,5 +13,6 @@ export async function GET() {
     panelOpacity:   configs.panelOpacity   !== undefined ? Number(configs.panelOpacity)   : 10,
     navOpacity:     configs.navOpacity     !== undefined ? Number(configs.navOpacity)      : 45,
     agentName:      configs.agentName ?? '塞塞',
+    wallpaper:      configs.wallpaper ?? '/wallpaper/default.jpg',
   })
 }
