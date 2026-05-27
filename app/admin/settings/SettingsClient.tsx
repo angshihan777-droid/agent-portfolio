@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useAppStore } from '@/store'
 import type { Live2DModel } from '@/store'
 
 const inputCls = 'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500'
@@ -23,6 +24,7 @@ export function SettingsClient({
   initNavOpacity: number
 }) {
   const [wallpaper, setWallpaper] = useState(initWallpaper)
+  const setStoreWallpaper = useAppStore((s) => s.setWallpaper)
   const [model, setModel] = useState<Live2DModel>(initModel)
   const [size, setSize] = useState(initSize)
   const [uploading, setUploading] = useState(false)
@@ -50,7 +52,8 @@ export function SettingsClient({
     form.append('type', 'wallpaper')
     const res = await fetch('/api/admin/upload', { method: 'POST', body: form })
     const { url } = await res.json()
-    setWallpaper(url)
+    setWallpaper(url)        // 更新本地预览
+    setStoreWallpaper(url)   // 同步到全局 Zustand store → Background 立即生效
     setUploading(false)
   }
 
