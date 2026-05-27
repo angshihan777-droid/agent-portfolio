@@ -43,18 +43,30 @@ export function SettingsClient({
   const [pwdMsg, setPwdMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [pwdLoading, setPwdLoading] = useState(false)
 
+  const [uploadError, setUploadError] = useState('')
+
   async function uploadWallpaper(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    const form = new FormData()
-    form.append('file', file)
-    form.append('type', 'wallpaper')
-    const res = await fetch('/api/admin/upload', { method: 'POST', body: form })
-    const { url } = await res.json()
-    setWallpaper(url)        // 更新本地预览
-    setStoreWallpaper(url)   // 同步到全局 Zustand store → Background 立即生效
-    setUploading(false)
+    setUploadError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('type', 'wallpaper')
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok || !data.url) {
+        setUploadError(data.error ?? `上传失败（HTTP ${res.status}）`)
+        return
+      }
+      setWallpaper(data.url)        // 更新本地预览
+      setStoreWallpaper(data.url)   // 同步到全局 Zustand store → Background 立即生效
+    } catch (err) {
+      setUploadError(String(err))
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function uploadResume(e: React.ChangeEvent<HTMLInputElement>) {
@@ -135,6 +147,7 @@ export function SettingsClient({
           </span>
           <input type="file" accept="image/*" onChange={uploadWallpaper} className="hidden" />
         </label>
+        {uploadError && <p className="text-red-500 text-xs mt-1">{uploadError}</p>}
         {wallpaper && (
           <div>
             <p className="text-xs text-gray-400 mb-1.5">预览（壁纸效果在<a href="/" target="_blank" className="text-blue-500 underline">前台页面</a>展示）</p>

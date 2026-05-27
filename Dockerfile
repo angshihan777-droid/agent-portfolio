@@ -36,6 +36,7 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/lib/generated ./lib/generated
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
+COPY --from=builder /app/next.config.ts ./
 COPY package.json ./
 
 # 持久化目录占位（运行时由 Docker 卷挂载覆盖）
