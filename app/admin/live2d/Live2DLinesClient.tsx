@@ -74,6 +74,30 @@ export function Live2DLinesClient({ lines: initLines }: { lines: Live2DLineRow[]
   const [addingScene, setAddingScene] = useState<string | null>(null)
   const [addForm, setAddForm]         = useState<Omit<Live2DLineRow, 'id'>>(emptyLine('idle'))
   const [saving, setSaving]           = useState(false)
+  const [seeding, setSeeding]         = useState(false)
+  const [seedMsg, setSeedMsg]         = useState('')
+
+  async function seedDefaults(replace = false) {
+    if (replace && !confirm('将清空所有台词并重新导入默认台词，确认继续？')) return
+    setSeeding(true)
+    setSeedMsg('')
+    const res = await fetch('/api/admin/seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: replace ? 'replace' : 'append' }),
+    })
+    const data = await res.json()
+    if (data.skipped) {
+      setSeedMsg(`已有 ${lines.length} 条台词，未导入（可点"覆盖导入"强制重置）`)
+    } else {
+      setSeedMsg(`成功导入 ${data.inserted} 条默认台词`)
+      // 重新拉取最新数据
+      const fresh = await fetch('/api/admin/live2d/lines').then(r => r.json())
+      setLines(fresh)
+    }
+    setSeeding(false)
+    setTimeout(() => setSeedMsg(''), 4000)
+  }
 
   // 按 scene 分组
   const byScene = useMemo(() => {
@@ -152,9 +176,32 @@ export function Live2DLinesClient({ lines: initLines }: { lines: Live2DLineRow[]
   return (
     <div className="p-8 space-y-6 max-w-4xl">
       {/* 标题 */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-800">Live2D 台词管理</h1>
-        <p className="text-sm text-gray-500 mt-1">按场景分类管理塞塞的台词，支持增删改和启用/禁用</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-800">Live2D 台词管理</h1>
+          <p className="text-sm text-gray-500 mt-1">按场景分类管理塞塞的台词，支持增删改和启用/禁用</p>
+        </div>
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <div className="flex gap-2">
+            <button
+              onClick={() => seedDefaults(false)}
+              disabled={seeding}
+              className="border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              title="仅在台词表为空时导入默认台词"
+            >
+              {seeding ? '导入中…' : '导入默认台词'}
+            </button>
+            <button
+              onClick={() => seedDefaults(true)}
+              disabled={seeding}
+              className="border border-red-200 text-red-500 px-3 py-1.5 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50 transition-colors"
+              title="清空所有台词，重新导入默认值"
+            >
+              覆盖导入
+            </button>
+          </div>
+          {seedMsg && <p className="text-xs text-gray-500">{seedMsg}</p>}
+        </div>
       </div>
 
       {/* 大模块 Tab */}
