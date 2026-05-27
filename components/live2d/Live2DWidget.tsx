@@ -173,25 +173,28 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
     async function init() {
       if (typeof window === 'undefined') return
 
-      // Load IIFE bundle via <script src> so the Cubism 5/6 runtime injection
-      // runs synchronously before module-level enum code references Live2DCubismCore.
-      // import('l2d-widget') via Turbopack breaks because the inline script that sets
-      // window.Live2DCubismCore executes asynchronously, causing "Live2DCubismCore is not defined".
+      // ── 1. 加载 IIFE bundle（<script src> 保证 Cubism 运行时同步初始化）──────
+      console.log('[Live2D] loading script…')
       await new Promise<void>((resolve, reject) => {
         if ((window as any).__l2dScriptLoaded) { resolve(); return }
         const s = document.createElement('script')
         s.src = '/live2d/l2d-widget.min.js'
-        s.onload  = () => { (window as any).__l2dScriptLoaded = true; resolve() }
-        s.onerror = () => reject(new Error('Failed to load l2d-widget script'))
+        s.onload  = () => { (window as any).__l2dScriptLoaded = true; console.log('[Live2D] script loaded'); resolve() }
+        s.onerror = () => reject(new Error('[Live2D] Failed to load /live2d/l2d-widget.min.js'))
         document.head.appendChild(s)
       })
       if (cancelled) return
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const createWidget: typeof import('l2d-widget').createWidget = (window as any).L2D_WIDGET?.createWidget
-      if (!createWidget) throw new Error('L2D_WIDGET.createWidget not found on window')
+      const w = window as any
+      const createWidget = w.L2D_WIDGET?.createWidget as ((...args: unknown[]) => { destroy: () => Promise<void> }) | undefined
+      if (!createWidget) {
+        console.error('[Live2D] L2D_WIDGET.createWidget not found. window.L2D_WIDGET =', w.L2D_WIDGET)
+        throw new Error('L2D_WIDGET.createWidget not found on window')
+      }
       if (cancelled) return
 
+      // ── 2. 销毁旧 widget ────────────────────────────────────────────────────
       if (widgetRef.current) {
         widgetContainerRef.current = null
         containerMutObs?.disconnect()
@@ -201,29 +204,17 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
       }
       if (cancelled) return
 
-      // MutationObserver 精确捕获本次 createWidget 创建的 container div
+      // ── 3. MutationObserver：createWidget 前注册，精确捕获新 container ───────
+      //    仅捕获引用，不在此处设 timer（避免双重赋值 forceShowTimer）
       containerMutObs = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           for (const node of mutation.addedNodes) {
             if (node instanceof HTMLElement && node.querySelector('canvas')) {
+              console.log('[Live2D] container captured by MutationObserver')
               widgetContainerRef.current = node
               ;(node.querySelector('canvas') as HTMLElement).style.pointerEvents = 'none'
               containerMutObs?.disconnect()
               containerMutObs = null
-
-              // 保险：4 秒后若 container 仍不可见（opacity=0），强制显示
-              // 防止 l2d-widget 的 loaded 事件因某种原因未触发
-              forceShowTimer = setTimeout(() => {
-                if (!cancelled && widgetContainerRef.current) {
-                  const c = widgetContainerRef.current
-                  if (c.style.opacity !== '1') {
-                    console.warn('[Live2D] force-show triggered — "loaded" event may not have fired')
-                    c.style.opacity = '1'
-                    c.style.transition = 'none'
-                  }
-                }
-              }, 4000)
-
               break
             }
           }
@@ -231,6 +222,8 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
       })
       containerMutObs.observe(document.body, { childList: true })
 
+      // ── 4. 创建 widget ──────────────────────────────────────────────────────
+      console.log('[Live2D] createWidget model=%s size=%d path=%s', model, size, MODEL_PATHS[model])
       widgetRef.current = createWidget({
         model: { path: MODEL_PATHS[model], tips: false },
         position: 'bottom-left',
@@ -240,6 +233,32 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
         transitionType: 'fade',
         transitionDuration: 600,
       })
+      console.log('[Live2D] createWidget returned', widgetRef.current)
+
+      // ── 5. 单一 forceShowTimer：2s 后强制所有含 canvas 的 body 直接子 div 可见
+      //    同时兜底 MutationObserver 漏检的情况
+      forceShowTimer = setTimeout(() => {
+        if (cancelled) return
+        // 先检查已捕获的 container
+        if (widgetContainerRef.current) {
+          const c = widgetContainerRef.current
+          console.log('[Live2D] forceShow — captured container opacity:', c.style.opacity)
+          if (c.style.opacity !== '1') {
+            console.warn('[Live2D] force-show: setting opacity=1 on captured container')
+            c.style.opacity = '1'
+            c.style.transition = 'none'
+          }
+        }
+        // 兜底扫描：对所有含 canvas 的 body 直接子 div 强制可见
+        document.querySelectorAll<HTMLElement>('body > div').forEach((el) => {
+          if (el.querySelector('canvas') && el.style.opacity !== '1') {
+            console.warn('[Live2D] force-show: fallback on body > div with canvas')
+            el.style.opacity = '1'
+            el.style.transition = 'none'
+            if (!widgetContainerRef.current) widgetContainerRef.current = el
+          }
+        })
+      }, 2000)
 
       if (!cancelled) {
         setTimeout(() => {
