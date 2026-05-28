@@ -21,14 +21,6 @@ const PROVIDER_OPTIONS = [
   { value: 'custom', label: '自定义 / 中转站', defaultBase: '', defaultModel: '' },
 ]
 
-// 各 provider 的预设模型列表（选"其他"时允许手填）
-const PRESET_MODELS: Record<string, string[]> = {
-  deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
-  openai:   ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo', 'o1', 'o1-mini', 'o3-mini'],
-  custom:   [],
-}
-const CUSTOM_VALUE = '__custom__'
-
 const PROVIDER_BADGE: Record<string, { bg: string; text: string; label: string }> = {
   deepseek: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'DS' },
   openai:   { bg: 'bg-green-100', text: 'text-green-700', label: 'OA' },
@@ -164,6 +156,38 @@ function LLMConfigSection({
   const EMPTY_DRAFT = { name: '', provider: 'deepseek', model: 'deepseek-chat', apiKey: '', baseUrl: 'https://api.deepseek.com' }
   const [draft, setDraft] = useState(EMPTY_DRAFT)
 
+  // 动态获取模型列表
+  const [fetchingModels, setFetchingModels] = useState(false)
+  const [fetchedModels, setFetchedModels] = useState<string[]>([])
+  const [fetchModelError, setFetchModelError] = useState('')
+
+  async function fetchModels() {
+    if (!draft.apiKey || !draft.baseUrl) return
+    setFetchingModels(true)
+    setFetchModelError('')
+    try {
+      const res = await fetch('/api/admin/llm-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl: draft.baseUrl, apiKey: draft.apiKey }),
+      })
+      const data = await res.json()
+      if (!res.ok || !Array.isArray(data.models)) {
+        setFetchModelError(data.error ?? '获取失败')
+        return
+      }
+      setFetchedModels(data.models)
+      // 若当前填写的模型不在列表里，自动选第一个
+      if (data.models.length > 0 && !data.models.includes(draft.model)) {
+        setDraft((d) => ({ ...d, model: data.models[0] }))
+      }
+    } catch (err) {
+      setFetchModelError(String(err))
+    } finally {
+      setFetchingModels(false)
+    }
+  }
+
   async function activate(id: string) {
     setSaving(id)
     await fetch('/api/admin/llm-config', {
@@ -209,9 +233,11 @@ function LLMConfigSection({
     setDraft((d) => ({
       ...d,
       provider: p,
-      model: d.model || opt?.defaultModel || '',
-      baseUrl: d.baseUrl || opt?.defaultBase || '',
+      model: opt?.defaultModel || '',
+      baseUrl: opt?.defaultBase || '',
     }))
+    setFetchedModels([])
+    setFetchModelError('')
   }
 
   return (
@@ -296,45 +322,38 @@ function LLMConfigSection({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">模型</label>
-              {(() => {
-                const presets = PRESET_MODELS[draft.provider] ?? []
-                const isCustomInput = presets.length > 0 && !presets.includes(draft.model)
-                const selectVal = isCustomInput ? CUSTOM_VALUE : draft.model
-                return presets.length > 0 ? (
-                  <div className="space-y-1.5">
-                    <select
-                      value={selectVal}
-                      onChange={(e) => {
-                        if (e.target.value === CUSTOM_VALUE) {
-                          setDraft({ ...draft, model: '' })
-                        } else {
-                          setDraft({ ...draft, model: e.target.value })
-                        }
-                      }}
-                      className={inputCls + ' w-full'}
-                    >
-                      {presets.map((m) => <option key={m} value={m}>{m}</option>)}
-                      <option value={CUSTOM_VALUE}>其他（手动输入）</option>
-                    </select>
-                    {(selectVal === CUSTOM_VALUE) && (
-                      <input
-                        value={draft.model}
-                        onChange={(e) => setDraft({ ...draft, model: e.target.value })}
-                        placeholder="输入模型名称"
-                        className={inputCls + ' w-full'}
-                        autoFocus
-                      />
-                    )}
-                  </div>
+              <div className="flex gap-1.5">
+                {fetchedModels.length > 0 ? (
+                  <select
+                    value={draft.model}
+                    onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+                    className={inputCls + ' flex-1 min-w-0'}
+                  >
+                    {fetchedModels.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
                 ) : (
                   <input
                     value={draft.model}
                     onChange={(e) => setDraft({ ...draft, model: e.target.value })}
-                    placeholder="模型名称"
-                    className={inputCls + ' w-full'}
+                    placeholder="手填，或点击→获取列表"
+                    className={inputCls + ' flex-1 min-w-0'}
                   />
-                )
-              })()}
+                )}
+                <button
+                  type="button"
+                  onClick={fetchModels}
+                  disabled={fetchingModels || !draft.apiKey || !draft.baseUrl}
+                  className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40 whitespace-nowrap flex-shrink-0"
+                  title={!draft.apiKey || !draft.baseUrl ? '请先填写 API Key 和 Base URL' : '从 Provider 获取模型列表'}
+                >
+                  {fetchingModels ? '获取中…' : '获取列表'}
+                </button>
+              </div>
+              {fetchModelError && (
+                <p className="text-xs text-red-500 mt-1">{fetchModelError}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Base URL（可选）</label>
@@ -365,7 +384,7 @@ function LLMConfigSection({
               {configs.length === 0 ? '添加并激活' : '添加'}
             </button>
             <button
-              onClick={() => { setShowForm(false); setDraft(EMPTY_DRAFT) }}
+              onClick={() => { setShowForm(false); setDraft(EMPTY_DRAFT); setFetchedModels([]); setFetchModelError('') }}
               className="px-4 py-1.5 bg-gray-100 text-gray-600 text-sm rounded-lg hover:bg-gray-200"
             >
               取消
