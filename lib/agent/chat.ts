@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { buildSystemPrompt } from './knowledge'
+import { updateMemories } from './memory'
 import { getConfig } from '@/lib/db/config'
 
 export interface ChatMessage {
@@ -81,7 +82,12 @@ export async function chat(req: ChatRequest): Promise<ChatResponse> {
       max_tokens: 600,
       temperature: 0.7,
     })
-    return { answer: completion.choices[0]?.message?.content ?? '抱歉，我暂时无法回答这个问题。' }
+    const answer = completion.choices[0]?.message?.content ?? '抱歉，我暂时无法回答这个问题。'
+
+    // 异步提取并持久化本轮记忆（即发即忘，不阻塞响应）
+    updateMemories(req.question, answer, client, model).catch(() => {})
+
+    return { answer }
   } catch (err) {
     console.error('[chat] LLM error:', err)
     return { answer: '抱歉，AI 服务暂时不可用，请稍后再试。', error: String(err) }
