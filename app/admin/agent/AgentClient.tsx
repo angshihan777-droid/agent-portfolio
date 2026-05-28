@@ -21,6 +21,14 @@ const PROVIDER_OPTIONS = [
   { value: 'custom', label: '自定义 / 中转站', defaultBase: '', defaultModel: '' },
 ]
 
+// 各 provider 的预设模型列表（选"其他"时允许手填）
+const PRESET_MODELS: Record<string, string[]> = {
+  deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
+  openai:   ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo', 'o1', 'o1-mini', 'o3-mini'],
+  custom:   [],
+}
+const CUSTOM_VALUE = '__custom__'
+
 const PROVIDER_BADGE: Record<string, { bg: string; text: string; label: string }> = {
   deepseek: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'DS' },
   openai:   { bg: 'bg-green-100', text: 'text-green-700', label: 'OA' },
@@ -287,13 +295,46 @@ function LLMConfigSection({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">模型名称</label>
-              <input
-                value={draft.model}
-                onChange={(e) => setDraft({ ...draft, model: e.target.value })}
-                placeholder="deepseek-chat"
-                className={inputCls + ' w-full'}
-              />
+              <label className="block text-xs text-gray-500 mb-1">模型</label>
+              {(() => {
+                const presets = PRESET_MODELS[draft.provider] ?? []
+                const isCustomInput = presets.length > 0 && !presets.includes(draft.model)
+                const selectVal = isCustomInput ? CUSTOM_VALUE : draft.model
+                return presets.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <select
+                      value={selectVal}
+                      onChange={(e) => {
+                        if (e.target.value === CUSTOM_VALUE) {
+                          setDraft({ ...draft, model: '' })
+                        } else {
+                          setDraft({ ...draft, model: e.target.value })
+                        }
+                      }}
+                      className={inputCls + ' w-full'}
+                    >
+                      {presets.map((m) => <option key={m} value={m}>{m}</option>)}
+                      <option value={CUSTOM_VALUE}>其他（手动输入）</option>
+                    </select>
+                    {(selectVal === CUSTOM_VALUE) && (
+                      <input
+                        value={draft.model}
+                        onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+                        placeholder="输入模型名称"
+                        className={inputCls + ' w-full'}
+                        autoFocus
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    value={draft.model}
+                    onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+                    placeholder="模型名称"
+                    className={inputCls + ' w-full'}
+                  />
+                )
+              })()}
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Base URL（可选）</label>

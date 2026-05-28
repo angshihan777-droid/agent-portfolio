@@ -2,6 +2,31 @@ import { getAbout } from '@/lib/db/about'
 import { getProjects } from '@/lib/db/projects'
 import { getTools } from '@/lib/db/tools'
 
+// ── GitHub README 缓存（进程级，TTL 30 分钟）────────────────────────────────────
+const readmeCache = new Map<string, { text: string; expiresAt: number }>()
+
+async function fetchReadme(githubUrl: string): Promise<string> {
+  const cached = readmeCache.get(githubUrl)
+  if (cached && cached.expiresAt > Date.now()) return cached.text
+
+  try {
+    // 把 github.com/owner/repo 转成 raw README
+    const match = githubUrl.match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?(?:\/|$)/)
+    if (!match) return ''
+    const repo = match[1]
+    const raw = `https://raw.githubusercontent.com/${repo}/HEAD/README.md`
+    const res = await fetch(raw, { signal: AbortSignal.timeout(3000) })
+    if (!res.ok) return ''
+    const text = await res.text()
+    // 截取前 1500 字符，避免 token 爆炸
+    const trimmed = text.slice(0, 1500)
+    readmeCache.set(githubUrl, { text: trimmed, expiresAt: Date.now() + 30 * 60 * 1000 })
+    return trimmed
+  } catch {
+    return ''
+  }
+}
+
 export async function buildSystemPrompt(): Promise<string> {
   const [about, allProjects, allTools] = await Promise.all([
     getAbout(),
@@ -15,9 +40,22 @@ export async function buildSystemPrompt(): Promise<string> {
     .map((g) => `${g.category}：${g.items.join('、')}`)
     .join('\n')
 
-  const projectsText = allProjects
-    .filter((p) => p.type === '我的项目')
-    .map((p) => `- 《${p.title}》（${p.category}）：${p.description} 技术栈：${p.techStack.join('、')}。亮点：${p.highlights.join('；')}`)
+  const myProjects = allProjects.filter((p) => p.type === '我的项目')
+
+  // 并行拉取所有有 GitHub 链接的项目 README（带超时，失败静默）
+  const readmes = await Promise.all(
+    myProjects.map((p) => p.githubUrl ? fetchReadme(p.githubUrl) : Promise.resolve(''))
+  )
+
+  const projectsText = myProjects
+    .map((p, i) => {
+      const links = [
+        p.githubUrl ? `GitHub：${p.githubUrl}` : '',
+        p.demoUrl   ? `在线体验：${p.demoUrl}`   : '',
+      ].filter(Boolean).join('  ')
+      const readme = readmes[i] ? `\n  README 摘要：${readmes[i].replace(/\n+/g, ' ').trim()}` : ''
+      return `- 《${p.title}》（${p.category}）：${p.description} 技术栈：${p.techStack.join('、')}。亮点：${p.highlights.join('；')}${links ? `  ${links}` : ''}${readme}`
+    })
     .join('\n')
 
   const recommendedTools = allTools
