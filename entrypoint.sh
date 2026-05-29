@@ -8,5 +8,8 @@ echo "同步数据库 schema..."
 npx prisma db push
 echo "数据库 schema 已就绪"
 
+echo "uploads 目录内容："
+ls -laR /app/public/uploads/ 2>/dev/null || echo "(空或不存在)"
+
 echo "启动 Next.js..."
 exec npm start
