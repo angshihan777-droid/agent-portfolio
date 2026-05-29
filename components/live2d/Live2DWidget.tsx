@@ -88,16 +88,25 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
 
   useEffect(() => { liveLineRef.current = live2dLine }, [live2dLine])
 
+  // 收起 / 展开
+  const [hidden, setHidden] = useState(false)
+
   // 拖拽位移同步到 l2d-widget 的原生 container div
   const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
   const dragRef    = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   const didDragRef = useRef(false)
 
+  // 计算完整 transform（含收起偏移）
+  const currentTransform = `translate(${pos.x + (hidden ? -targetSize.current : 0)}px, ${pos.y}px)`
+  const transitionStyle  = isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+
   useEffect(() => {
     if (widgetContainerRef.current) {
-      widgetContainerRef.current.style.transform = `translate(${pos.x}px, ${pos.y}px)`
+      widgetContainerRef.current.style.transform  = currentTransform
+      widgetContainerRef.current.style.transition = transitionStyle
     }
-  }, [pos])
+  }, [pos, hidden, isDragging, currentTransform, transitionStyle])
 
   // 台词
   useEffect(() => {
@@ -300,9 +309,11 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
 
   // ── 拖拽 ─────────────────────────────────────────────────────────────────────
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (hidden) return  // 收起时不允许拖拽
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y }
     didDragRef.current = false
+    setIsDragging(true)
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return
@@ -317,10 +328,10 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
   }
   function onPointerUp() {
     dragRef.current = null
+    setIsDragging(false)
     setTimeout(() => { didDragRef.current = false }, 50)
   }
 
-  const transform = `translate(${pos.x}px, ${pos.y}px)`
   const size = targetSize.current
 
   return (
@@ -328,29 +339,62 @@ export function Live2DWidget({ initialModel, initialSize }: Props) {
       {/* 气泡 — z-index 在 l2d-widget(9999) 之上 */}
       <div
         className="fixed bottom-0 left-0 pointer-events-none"
-        style={{ width: size, height: size, transform, zIndex: 10000 }}
+        style={{ width: size, height: size, transform: currentTransform, transition: transitionStyle, zIndex: 10000 }}
       >
-        <SpeechBubble text={live2dLine} />
+        <SpeechBubble text={hidden ? '' : live2dLine} />
       </div>
 
       {/* 底部投影 */}
       <div
         className="fixed bottom-0 left-0 pointer-events-none"
         style={{
-          width: size, height: 28, transform, zIndex: 9998,
+          width: size, height: 28,
+          transform: currentTransform, transition: transitionStyle, zIndex: 9998,
           background: 'radial-gradient(ellipse 60% 100% at 50% 100%, rgba(0,0,0,0.38) 0%, transparent 70%)',
         }}
       />
 
       {/* 拖拽遮罩 — 必须在 canvas(z:9999) 之上 */}
       <div
-        className="fixed bottom-0 left-0 touch-none select-none cursor-grab active:cursor-grabbing"
-        style={{ width: size, height: size, transform, zIndex: 10001 }}
+        className="fixed bottom-0 left-0 touch-none select-none"
+        style={{
+          width: size, height: size,
+          transform: currentTransform, transition: transitionStyle, zIndex: 10001,
+          cursor: hidden ? 'default' : 'grab',
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onClick={handleClick}
       />
+
+      {/* 收起 / 展开 切换按钮 — 跟随 widget 的 transform，始终在右侧露出 */}
+      <div
+        className="fixed bottom-0 left-0 pointer-events-none"
+        style={{ width: size, height: size, transform: currentTransform, transition: transitionStyle, zIndex: 10002 }}
+      >
+        <button
+          className={`
+            pointer-events-auto absolute right-0 bottom-1/2 translate-x-full -translate-y-1/2
+            w-6 flex flex-col items-center justify-center gap-0.5
+            rounded-r-xl py-3 shadow-lg transition-colors select-none
+            ${hidden
+              ? 'bg-blue-500/90 hover:bg-blue-500 text-white'
+              : 'bg-black/25 hover:bg-black/40 text-white/80'}
+          `}
+          onClick={(e) => { e.stopPropagation(); setHidden((h) => !h) }}
+          title={hidden ? '展开塞塞' : '收起塞塞'}
+        >
+          {hidden ? (
+            <>
+              <span className="text-[9px] leading-tight font-medium" style={{ writingMode: 'vertical-rl' }}>塞塞</span>
+              <span className="text-[10px]">›</span>
+            </>
+          ) : (
+            <span className="text-[11px]">‹</span>
+          )}
+        </button>
+      </div>
     </>
   )
 }
