@@ -9,6 +9,7 @@ const navItems = [
   { href: '/admin/about', label: '个人信息' },
   { href: '/admin/live2d', label: 'Live2D 台词' },
   { href: '/admin/welcome', label: '欢迎弹窗' },
+  { href: '/admin/visitors', label: '访客记录' },
   { href: '/admin/settings', label: '站点设置' },
 ]
 

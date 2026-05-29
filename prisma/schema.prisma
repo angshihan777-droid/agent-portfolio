@@ -64,3 +64,12 @@ model PageView {
   page      String
   createdAt DateTime @default(now())
 }
+
+model ChatLog {
+  id        String   @id @default(cuid())
+  ip        String   @default("")
+  location  String   @default("")
+  question  String
+  answer    String   @default("")
+  createdAt DateTime @default(now())
+}
