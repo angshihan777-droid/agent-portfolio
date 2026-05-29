@@ -45,6 +45,9 @@ export function SettingsClient({
 
   const [uploadError, setUploadError] = useState('')
 
+  const [resumeStatus, setResumeStatus] = useState<'idle' | 'uploading' | 'ok' | 'error'>('idle')
+  const [resumeError, setResumeError] = useState('')
+
   async function uploadWallpaper(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -72,11 +75,32 @@ export function SettingsClient({
   async function uploadResume(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const form = new FormData()
-    form.append('file', file)
-    form.append('type', 'resume')
-    await fetch('/api/admin/upload', { method: 'POST', body: form })
-    alert('简历上传成功')
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setResumeStatus('error')
+      setResumeError('请上传 PDF 格式文件')
+      return
+    }
+    setResumeStatus('uploading')
+    setResumeError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('type', 'resume')
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) {
+        setResumeStatus('error')
+        setResumeError(data.error ?? `上传失败（HTTP ${res.status}）`)
+        return
+      }
+      setResumeStatus('ok')
+      setTimeout(() => setResumeStatus('idle'), 3000)
+    } catch {
+      setResumeStatus('error')
+      setResumeError('网络异常，请重试')
+    }
+    // 清空 input，允许重复上传同一文件
+    e.target.value = ''
   }
 
   async function changePassword() {
@@ -321,11 +345,29 @@ export function SettingsClient({
       {/* 简历 */}
       <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
         <h2 className="font-medium text-gray-800">简历 PDF</h2>
-        <p className="text-xs text-gray-500">上传后覆盖 /uploads/resume/resume.pdf</p>
+        <p className="text-xs text-gray-500">上传后覆盖旧简历，前台"下载简历"按钮会指向这份文件</p>
         <label className="flex items-center gap-2 cursor-pointer">
-          <span className="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-sm text-gray-700 transition-colors">选择 PDF 上传</span>
-          <input type="file" accept=".pdf" onChange={uploadResume} className="hidden" />
+          <span className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+            resumeStatus === 'uploading'
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-gray-100 hover:bg-gray-200 text-gray-700 cursor-pointer'
+          }`}>
+            {resumeStatus === 'uploading' ? '上传中...' : '选择 PDF 上传'}
+          </span>
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={uploadResume}
+            disabled={resumeStatus === 'uploading'}
+            className="hidden"
+          />
+          {resumeStatus === 'ok' && (
+            <span className="text-sm text-green-600 font-medium">✓ 上传成功</span>
+          )}
         </label>
+        {resumeStatus === 'error' && (
+          <p className="text-red-500 text-xs">{resumeError}</p>
+        )}
       </section>
     </div>
   )

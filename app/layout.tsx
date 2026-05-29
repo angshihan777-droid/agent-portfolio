@@ -26,8 +26,31 @@ const geistMono = Geist_Mono({
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: "Ashia's Portfolio",
-  description: 'AI Agent / Web 开发 / 工具型产品 — Ashia 的个人展示站',
+  title: "Ashia's Portfolio — AI Agent · Web 开发",
+  description:
+    'Hi，我是 Ashia，专注 AI Agent 开发、Web 工程与工具型产品。这里有我的项目作品、技术栈，以及 AI 秘书塞塞，欢迎与她聊聊～',
+  keywords: ['AI Agent', 'Web开发', '前端', 'Next.js', 'Python', '个人作品集', 'Portfolio'],
+  authors: [{ name: 'Ashia' }],
+  openGraph: {
+    title: "Ashia's Portfolio",
+    description: 'AI Agent / Web 开发 / 工具型产品 — 与 AI 秘书塞塞聊聊 Ashia 吧 (◕‿◕✿)',
+    type: 'website',
+    locale: 'zh_CN',
+    images: [
+      {
+        url: '/wallpaper/default.jpg',
+        width: 1200,
+        height: 630,
+        alt: "Ashia's Portfolio",
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Ashia's Portfolio",
+    description: 'AI Agent / Web 开发 / 工具型产品',
+    images: ['/wallpaper/default.jpg'],
+  },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

@@ -11,6 +11,7 @@ export function ChatWindow() {
   const { chatHistory, addMessage, updateMessage, setLive2dLine, agentName } = useAppStore()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [streamingId, setStreamingId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -55,7 +56,8 @@ export function ChatWindow() {
         timestamp: new Date(),
       })
       setLive2dLine('')
-      setLoading(false) // 隐藏打点动画，流式内容开始出现
+      setLoading(false)       // 隐藏打点动画，流式内容开始出现
+      setStreamingId(assistantId)
 
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
@@ -70,6 +72,7 @@ export function ChatWindow() {
       // flush 最后一帧
       const tail = decoder.decode()
       if (tail) updateMessage(assistantId, accumulated + tail)
+      setStreamingId(null)    // 流结束，移除光标
     } catch (err) {
       const msg = err instanceof Error ? err.message : '网络异常，请稍后重试。'
       setLive2dLine('哎呀，网络好像出问题了 (>_<)')
@@ -82,6 +85,7 @@ export function ChatWindow() {
       })
     } finally {
       setLoading(false)
+      setStreamingId(null)
     }
   }
 
@@ -107,7 +111,12 @@ export function ChatWindow() {
           </div>
         )}
         {chatHistory.map((msg) => (
-          <ChatMessage key={msg.id} role={msg.role} content={msg.content} />
+          <ChatMessage
+            key={msg.id}
+            role={msg.role}
+            content={msg.content}
+            isStreaming={msg.id === streamingId}
+          />
         ))}
         {loading && (
           <div className="flex gap-2 mb-3">
@@ -151,12 +160,12 @@ export function ChatWindow() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send(input)}
             placeholder="向 Agent 提问…"
-            disabled={loading}
+            disabled={loading || !!streamingId}
             className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/55 focus:outline-none focus:border-blue-400/60 transition-colors disabled:opacity-50"
           />
           <button
             onClick={() => send(input)}
-            disabled={loading || !input.trim()}
+            disabled={loading || !!streamingId || !input.trim()}
             className="px-4 py-2 rounded-xl text-white text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed send-btn"
           >
             发送
