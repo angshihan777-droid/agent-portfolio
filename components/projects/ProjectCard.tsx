@@ -20,7 +20,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
 
   return (
     <GlassPanel
-      className="flex flex-col gap-3 p-4 hover:bg-white/15 transition-colors cursor-pointer"
+      className="h-full flex flex-col gap-3 p-4 hover:bg-white/15 transition-colors cursor-pointer"
       onClick={onClick}
       onMouseEnter={handleHover}
     >

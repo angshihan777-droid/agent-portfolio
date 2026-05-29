@@ -17,11 +17,17 @@ export function ProjectsPageClient({ projects }: { projects: ProjectRow[] }) {
   const [catFilter, setCatFilter] = useState<CatFilter>('全部')
   const [selected, setSelected] = useState<ProjectRow | null>(null)
 
-  const filtered = projects.filter(
-    (p) =>
-      (typeFilter === '全部' || p.type === typeFilter) &&
-      (catFilter === '全部' || p.category === catFilter),
-  )
+  const filtered = projects
+    .filter(
+      (p) =>
+        (typeFilter === '全部' || p.type === typeFilter) &&
+        (catFilter === '全部' || p.category === catFilter),
+    )
+    // 精选优先，其余维持原顺序
+    .sort((a, b) => {
+      if (a.isFeatured === b.isFeatured) return 0
+      return a.isFeatured ? -1 : 1
+    })
 
   return (
     <>
@@ -64,10 +70,11 @@ export function ProjectsPageClient({ projects }: { projects: ProjectRow[] }) {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {filtered.map((project, i) => (
               <motion.div
                 key={project.id}
+                className="h-full"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
