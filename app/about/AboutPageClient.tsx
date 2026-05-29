@@ -57,7 +57,7 @@ function ContactButton({ item }: { item: ContactItem }) {
   )
 }
 
-export function AboutPageClient({ about }: { about: AboutData }) {
+export function AboutPageClient({ about, hasResume = false }: { about: AboutData; hasResume?: boolean }) {
   const avatarUrl = (about as any).avatarUrl as string | undefined
 
   return (
@@ -188,13 +188,19 @@ export function AboutPageClient({ about }: { about: AboutData }) {
               </div>
             </GlassPanel>
 
-            <a
-              href={about.resumeUrl}
-              download
-              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-500/80 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
-            >
-              ↓ 下载简历 PDF
-            </a>
+            {hasResume ? (
+              <a
+                href="/uploads/resume/resume.pdf"
+                download="resume.pdf"
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-500/80 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+              >
+                ↓ 下载简历 PDF
+              </a>
+            ) : (
+              <div className="flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-white/5 text-white/30 text-sm cursor-not-allowed">
+                简历暂未上传
+              </div>
+            )}
           </div>
 
         </div>
