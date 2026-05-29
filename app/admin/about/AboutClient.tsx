@@ -15,26 +15,44 @@ function AvatarUploader({
   onChange: (url: string) => void
 }) {
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [imgBroken, setImgBroken] = useState(false)
 
   async function upload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    const form = new FormData()
-    form.append('file', file)
-    form.append('type', 'avatar')
-    const res = await fetch('/api/admin/upload', { method: 'POST', body: form })
-    const data = await res.json()
-    if (data.url) onChange(data.url)
-    setUploading(false)
-    e.target.value = ''
+    setError('')
+    setImgBroken(false)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('type', 'avatar')
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok || !data.url) {
+        setError(data.error ?? `上传失败（HTTP ${res.status}）`)
+        return
+      }
+      onChange(data.url)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
   }
 
   return (
     <div className="flex items-center gap-4">
       <div className="h-16 w-16 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-gray-200 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="avatar" className="h-full w-full object-cover" />
+        {avatarUrl && !imgBroken ? (
+          <img
+            src={avatarUrl}
+            alt="avatar"
+            className="h-full w-full object-cover"
+            onError={() => setImgBroken(true)}
+          />
         ) : (
           <span className="text-white text-2xl font-bold">?</span>
         )}
@@ -46,9 +64,14 @@ function AvatarUploader({
           </span>
           <input type="file" accept="image/*" onChange={upload} className="hidden" disabled={uploading} />
         </label>
-        {avatarUrl ? (
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        {avatarUrl && !imgBroken && (
           <p className="text-xs text-gray-400 truncate max-w-[200px]">{avatarUrl}</p>
-        ) : (
+        )}
+        {imgBroken && (
+          <p className="text-xs text-orange-500">图片链接无效，请重新上传</p>
+        )}
+        {!avatarUrl && !error && (
           <p className="text-xs text-gray-400">建议正方形图片，支持 JPG / PNG / WebP</p>
         )}
       </div>
