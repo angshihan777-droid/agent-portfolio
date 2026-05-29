@@ -16,6 +16,7 @@ interface AppStore {
 
   chatHistory: Message[]
   addMessage: (msg: Message) => void
+  updateMessage: (id: string, content: string) => void
   clearChat: () => void
 
   firstVisitDone: boolean
@@ -60,6 +61,10 @@ export const useAppStore = create<AppStore>((set) => ({
 
   chatHistory: [],
   addMessage: (msg) => set((s) => ({ chatHistory: [...s.chatHistory, msg] })),
+  updateMessage: (id, content) =>
+    set((s) => ({
+      chatHistory: s.chatHistory.map((m) => (m.id === id ? { ...m, content } : m)),
+    })),
   clearChat: () => set({ chatHistory: [] }),
 
   firstVisitDone: false,

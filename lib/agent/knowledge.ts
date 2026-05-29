@@ -2,6 +2,14 @@ import { getAbout } from '@/lib/db/about'
 import { getProjects } from '@/lib/db/projects'
 import { getTools } from '@/lib/db/tools'
 
+// ── System prompt 缓存（进程级，TTL 5 分钟）──────────────────────────────────────
+let promptCache: { value: string; expiresAt: number } | null = null
+
+/** 管理员保存 About / Projects / Tools 时调用，立即失效缓存 */
+export function clearPromptCache() {
+  promptCache = null
+}
+
 // ── GitHub README 缓存（进程级，TTL 30 分钟）────────────────────────────────────
 const readmeCache = new Map<string, { text: string; expiresAt: number }>()
 
@@ -27,6 +35,11 @@ async function fetchReadme(githubUrl: string): Promise<string> {
 }
 
 export async function buildSystemPrompt(): Promise<string> {
+  // 命中缓存直接返回
+  if (promptCache && promptCache.expiresAt > Date.now()) {
+    return promptCache.value
+  }
+
   const [about, allProjects, allTools] = await Promise.all([
     getAbout(),
     getProjects(),
@@ -78,7 +91,7 @@ export async function buildSystemPrompt(): Promise<string> {
     .map((w) => `- ${w.company} / ${w.position}（${w.period}）：${w.highlights.join('；')}`)
     .join('\n')
 
-  return `你是**塞塞**，${about.name} 的专属 AI 秘书，由 ${about.name} 亲手培养 (◕‿◕✿)
+  const result = `你是**塞塞**，${about.name} 的专属 AI 秘书，由 ${about.name} 亲手培养 (◕‿◕✿)
 
 ## 塞塞的人设
 - **名字**：塞塞，专属秘书，不是通用 AI 助手。
@@ -128,4 +141,7 @@ ${about.contact.map((c) => (c.type === 'link' ? `${c.label}：${c.href}` : `${c.
 5. 可以引导访客去查看项目页（/projects）或关于页（/about）了解更多。
 
 6. 如果被问到"你是谁""你是 AI 吗"，大方承认是 AI，并介绍自己是 ${about.name} 专属培养的秘书 塞塞 ヾ(≧▽≦*)o`
+
+  promptCache = { value: result, expiresAt: Date.now() + 5 * 60 * 1000 }
+  return result
 }

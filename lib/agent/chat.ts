@@ -18,7 +18,7 @@ export interface ChatResponse {
   error?: string
 }
 
-async function getLLMClient(): Promise<{ client: OpenAI; model: string }> {
+export async function getLLMClient(): Promise<{ client: OpenAI; model: string }> {
   const [configsJson, activeId] = await Promise.all([
     getConfig('llmConfigs'),
     getConfig('llmActiveId'),

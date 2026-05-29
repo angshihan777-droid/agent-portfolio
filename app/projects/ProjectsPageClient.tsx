@@ -70,7 +70,7 @@ export function ProjectsPageClient({ projects }: { projects: ProjectRow[] }) {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filtered.map((project, i) => (
               <motion.div
                 key={project.id}

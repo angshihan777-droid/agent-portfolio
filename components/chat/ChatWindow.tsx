@@ -8,7 +8,7 @@ import { SuggestedQuestions } from './SuggestedQuestions'
 import { GlassPanel } from '@/components/layout/GlassPanel'
 
 export function ChatWindow() {
-  const { chatHistory, addMessage, setLive2dLine, agentName } = useAppStore()
+  const { chatHistory, addMessage, updateMessage, setLive2dLine, agentName } = useAppStore()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -39,23 +39,45 @@ export function ChatWindow() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: userMsg.content, history, currentPage: '/' }),
       })
-      const data = await res.json()
-      // 回答完毕，清空气泡（淡出）
-      setLive2dLine('')
+
+      if (!res.ok) {
+        // 非 2xx 时尝试解析错误信息
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+      }
+
+      // 响应成功：添加空白助手消息，流式填充内容
+      const assistantId = (Date.now() + 1).toString()
       addMessage({
-        id: (Date.now() + 1).toString(),
+        id: assistantId,
         role: 'assistant',
-        content: data.answer ?? '抱歉，出现了一些问题。',
+        content: '',
         timestamp: new Date(),
       })
-    } catch {
-      // 报错时给个可爱的提示，3 秒后自动消失
+      setLive2dLine('')
+      setLoading(false) // 隐藏打点动画，流式内容开始出现
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        accumulated += decoder.decode(value, { stream: true })
+        updateMessage(assistantId, accumulated)
+      }
+      // flush 最后一帧
+      const tail = decoder.decode()
+      if (tail) updateMessage(assistantId, accumulated + tail)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '网络异常，请稍后重试。'
       setLive2dLine('哎呀，网络好像出问题了 (>_<)')
       setTimeout(() => setLive2dLine(''), 3000)
       addMessage({
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: '网络异常，请稍后重试。',
+        content: msg,
         timestamp: new Date(),
       })
     } finally {

@@ -56,8 +56,10 @@ export default async function AdminDashboard() {
 
   // 只取最近 90 天的 PV 数据，防止全表扫描在大量记录时拖慢首屏
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
 
-  const [projectCount, toolCount, lineCount, rawViews] = await Promise.all([
+  const [projectCount, toolCount, lineCount, rawViews, chatLogsToday, chatLogsTotal] = await Promise.all([
     db.project.count(),
     db.tool.count(),
     db.live2DLine.count(),
@@ -66,6 +68,11 @@ export default async function AdminDashboard() {
       where: { createdAt: { gte: ninetyDaysAgo } },
       orderBy: { createdAt: 'asc' },
     }),
+    db.chatLog.findMany({
+      select: { ip: true },
+      where: { createdAt: { gte: todayStart } },
+    }),
+    db.chatLog.count(),
   ])
 
   const allDates = rawViews.map((v) => new Date(v.createdAt))
@@ -75,10 +82,19 @@ export default async function AdminDashboard() {
   const d7 = buildDaily(allDates, 7, now)
   const all = buildAllTime(allDates)
 
-  const stats = [
+  const todayQuestions = chatLogsToday.length
+  const todayVisitors = new Set(chatLogsToday.map((l) => l.ip).filter(Boolean)).size
+
+  const contentStats = [
     { label: '项目', count: projectCount, href: '/admin/projects' },
     { label: '工具', count: toolCount, href: '/admin/tools' },
     { label: 'Live2D 台词', count: lineCount, href: '/admin/live2d' },
+  ]
+
+  const chatStats = [
+    { label: '今日提问', count: todayQuestions, href: '/admin/visitors' },
+    { label: '今日访客', count: todayVisitors, href: '/admin/visitors' },
+    { label: '总提问数', count: chatLogsTotal, href: '/admin/visitors' },
   ]
 
   return (
@@ -86,17 +102,37 @@ export default async function AdminDashboard() {
       <h1 className="text-2xl font-semibold text-gray-800">仪表盘</h1>
 
       {/* 内容统计 */}
-      <div className="grid grid-cols-3 gap-4">
-        {stats.map((s) => (
-          <Link
-            key={s.label}
-            href={s.href}
-            className="bg-white rounded-xl border border-gray-200 p-6 hover:border-blue-300 hover:shadow-sm transition-all"
-          >
-            <p className="text-sm text-gray-500">{s.label}</p>
-            <p className="text-3xl font-bold text-gray-800 mt-1">{s.count}</p>
-          </Link>
-        ))}
+      <div>
+        <p className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">内容管理</p>
+        <div className="grid grid-cols-3 gap-4">
+          {contentStats.map((s) => (
+            <Link
+              key={s.label}
+              href={s.href}
+              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-blue-300 hover:shadow-sm transition-all"
+            >
+              <p className="text-sm text-gray-500">{s.label}</p>
+              <p className="text-3xl font-bold text-gray-800 mt-1">{s.count}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* AI 对话统计 */}
+      <div>
+        <p className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">AI 对话统计</p>
+        <div className="grid grid-cols-3 gap-4">
+          {chatStats.map((s) => (
+            <Link
+              key={s.label}
+              href={s.href}
+              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-blue-300 hover:shadow-sm transition-all"
+            >
+              <p className="text-sm text-gray-500">{s.label}</p>
+              <p className="text-3xl font-bold text-gray-800 mt-1">{s.count}</p>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* 访问统计折线图 */}
