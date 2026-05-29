@@ -590,12 +590,23 @@ function ContactEditor({ contact, onChange }: { contact: any[]; onChange: (c: an
 
 // ── 主组件 ─────────────────────────────────────────────────────────────────────
 
+const EMPTY_ABOUT: AboutData = {
+  name: '',
+  nickname: '',
+  avatarUrl: '',
+  jobDirection: [],
+  summary: '',
+  contact: [],
+  resumeUrl: '',
+  techStack: [],
+  workExperience: [],
+  education: [],
+}
+
 export function AboutClient({ initialAbout }: { initialAbout: AboutData | null }) {
-  const [about, setAbout] = useState<AboutData | null>(initialAbout)
+  const [about, setAbout] = useState<AboutData>(initialAbout ?? EMPTY_ABOUT)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
-
-  if (!about) return <div className="p-8 text-gray-500">暂无数据</div>
 
   const directions: string[] = Array.isArray(about.jobDirection)
     ? about.jobDirection
